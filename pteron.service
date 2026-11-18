@@ -1,0 +1,17 @@
+[Unit]
+Description=pteron local page publishing service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/pteron serve
+WorkingDirectory=%h
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=10
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

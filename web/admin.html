@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pteron · Published pages</title>
+<style>
+:root { color-scheme: light; --cloud:#f4f7fb; --ink:#243648; --blue:#365bd6; --lavender:#e9e7f5; --line:#dce3ed; --paper:#fff; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--cloud); color:var(--ink); font:16px/1.5 "Segoe UI",Candara,sans-serif; }
+main { max-width:1380px; margin:auto; padding:48px 40px 80px; }
+header { display:flex; align-items:center; justify-content:space-between; gap:24px; margin-bottom:56px; }
+.brand { display:flex; align-items:center; gap:16px; }
+.brand svg { width:52px; height:52px; color:var(--blue); }
+h1 { margin:0; font:600 38px/1.1 "Trebuchet MS",sans-serif; letter-spacing:-1.5px; }
+.subtitle { margin:5px 0 0; color:#526579; font-size:14px; }
+button { font:inherit; font-size:14px; border:1px solid #bdcbdc; border-radius:7px; background:var(--paper); color:var(--ink); padding:7px 12px; cursor:pointer; }
+button:hover { background:#eaf0fb; }
+button:disabled { opacity:.6; cursor:wait; }
+a { color:var(--blue); text-decoration-thickness:1px; text-underline-offset:3px; }
+:focus-visible { outline:3px solid #647ef0; outline-offset:3px; }
+.topline { display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin-bottom:18px; }
+h2 { margin:0; font-size:23px; font-weight:600; }
+#count { color:#526579; font-size:14px; }
+.columns,.row { display:grid; grid-template-columns:minmax(180px,1.2fr) minmax(230px,1.6fr) minmax(155px,1fr) minmax(150px,.9fr); gap:24px; }
+.columns { padding:0 22px 10px; color:#526579; font-size:13px; }
+article { background:var(--paper); border-bottom:1px solid var(--line); }
+article:first-child { border-top:3px solid var(--blue); }
+.row { padding:25px 22px; align-items:start; }
+h3 { font-size:17px; font-weight:600; margin:0 0 4px; overflow-wrap:anywhere; }
+.site-id { color:#526579; font-size:13px; }
+.address { font-size:13px; overflow-wrap:anywhere; display:block; margin-bottom:9px; }
+.times { color:#526579; font-size:12px; display:grid; gap:5px; }
+.times strong { font-weight:500; color:var(--ink); display:block; }
+.actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:10px; }
+.danger { color:#a02e40; }
+.status { display:inline-block; font-size:12px; padding:3px 9px; border-radius:5px; background:var(--lavender); color:#4b4479; }
+.feedback { border-top:1px dashed var(--line); padding:18px 22px; }
+.feedback[hidden] { display:none; }
+.feedback pre { white-space:pre-wrap; overflow-wrap:anywhere; font-size:13px; line-height:1.5; max-height:350px; overflow:auto; margin:0 0 15px; }
+#message { min-height:24px; margin:14px 0; font-size:14px; color:#526579; }
+#message.error { color:#a02e40; }
+.empty { padding:50px 22px; background:var(--paper); border-top:3px solid var(--blue); }
+.empty p { max-width:65ch; margin:8px 0; color:#526579; }
+code { background:#eaf0fb; border-radius:4px; padding:3px 6px; font-size:13px; }
+footer { color:#526579; font-size:13px; margin-top:24px; }
+@media(max-width:1000px) { .columns { display:none; } .row { grid-template-columns:1fr 1fr; gap:20px; } }
+@media(max-width:600px) { main { padding:26px 18px 40px; } header { margin-bottom:34px; } h1 { font-size:32px; } .brand { gap:10px; } .brand svg { width:38px; } .row { grid-template-columns:1fr; gap:16px; padding:22px 18px; } .times { grid-template-columns:1fr 1fr; } .subtitle { max-width:180px; } .topline { align-items:center; } }
+</style>
+</head>
+<body>
+<main>
+<header>
+ <div class="brand"><svg viewBox="0 0 60 60" aria-hidden="true" fill="none"><path d="M7 45 25 13l28-4-22 16-5 26-9-13" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="m17 38 14-13 22-16" stroke="currentColor" stroke-width="2"/></svg><div><h1>pteron</h1><p class="subtitle">A home for your published pages.</p></div></div>
+ <button id="refresh" type="button">Refresh</button>
+</header>
+<div class="topline"><h2>Published pages</h2><span id="count"></span></div>
+<div class="columns" aria-hidden="true"><span>Page</span><span>Share</span><span>Activity</span><span>Feedback</span></div>
+<div id="sites" aria-live="polite"></div>
+<p id="message" role="status"></p>
+<footer>Pages and feedback stay on this machine. Share a page’s URL with devices on your tailnet.</footer>
+</main>
+<script>
+'use strict';
+const list = document.querySelector('#sites');
+const message = document.querySelector('#message');
+function notice(text, error = false) { message.textContent = text; message.classList.toggle('error', error); }
+function node(tag, className, text) { const el = document.createElement(tag); if (className) el.className = className; if (text !== undefined) el.textContent = text; return el; }
+function button(label, action, className) {
+ const el = node('button', className, label); el.type = 'button';
+ el.addEventListener('click', async () => { el.disabled = true; try { await action(el); } catch (error) { notice(error.message, true); } finally { el.disabled = false; } });
+ return el;
+}
+async function request(path, method = 'GET') {
+ const response = await fetch(path, { method, cache:'no-store' });
+ const result = await response.json();
+ if (!response.ok) throw new Error(result.error || 'Request failed: ' + response.status);
+ return result;
+}
+function date(value) { return value ? new Date(value).toLocaleString(undefined, { dateStyle:'medium', timeStyle:'short' }) : 'Not saved'; }
+async function copy(text) {
+ if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
+ else {
+  const field = node('textarea'); field.value = text; field.style.cssText = 'position:fixed;left:-9999px;'; document.body.append(field); field.select();
+  const success = document.execCommand('copy'); field.remove();
+  if (!success) throw new Error('Select the page URL to copy it.');
+ }
+ notice('URL copied.');
+}
+function render(site) {
+ const article = node('article');
+ const row = node('div', 'row');
+ const page = node('div');
+ const title = node('h3'); const link = node('a', '', site.title); link.href = '/s/' + encodeURIComponent(site.id); link.target = '_blank'; link.rel = 'noopener'; title.append(link);
+ page.append(title, node('div', 'site-id', site.id));
+ const share = node('div'); const address = node('a', 'address', site.url); address.href = site.url; address.target = '_blank'; address.rel = 'noopener'; share.append(address, button('Copy URL', () => copy(site.url)));
+ const times = node('div', 'times');
+ for (const [label, value] of [['Updated', site.updated_at], ['Created', site.created_at]]) { const item = node('div'); item.append(node('strong', '', label), document.createTextNode(date(value))); times.append(item); }
+ const feedback = site.feedback || { fields:{} };
+ const count = Object.keys(feedback.fields || {}).length;
+ const controls = node('div'); controls.append(node('span', 'status', feedback.submitted ? 'Submitted · ' + count + ' fields' : count ? count + ' saved fields' : 'No feedback'));
+ const expanded = node('div', 'feedback'); expanded.hidden = true; expanded.id = 'feedback-' + site.id;
+ const pre = node('pre', '', JSON.stringify(feedback, null, 2)); expanded.append(pre);
+ expanded.append(button('Clear feedback', async () => {
+  if (!confirm('Clear all feedback for “' + site.title + '”?')) return;
+  await request('/api/sites/' + site.id + '/feedback', 'DELETE'); await load(); notice('Feedback cleared.');
+ }, 'danger'));
+ const actions = node('div', 'actions');
+ const view = button('View JSON', async el => {
+  expanded.hidden = !expanded.hidden; el.setAttribute('aria-expanded', String(!expanded.hidden)); el.textContent = expanded.hidden ? 'View JSON' : 'Hide JSON';
+  if (!expanded.hidden) pre.textContent = JSON.stringify(await request('/api/sites/' + site.id + '/feedback'), null, 2);
+ });
+ view.setAttribute('aria-controls', expanded.id); view.setAttribute('aria-expanded', 'false');
+ actions.append(view, button('Delete', async () => {
+  if (!confirm('Delete “' + site.title + '” and its saved feedback?')) return;
+  await request('/api/sites/' + site.id, 'DELETE'); await load(); notice('Page deleted.');
+ }, 'danger'));
+ controls.append(actions); row.append(page, share, times, controls); article.append(row, expanded); return article;
+}
+let loading = false;
+async function load() {
+ if (loading) return; loading = true;
+ const refresh = document.querySelector('#refresh'); refresh.disabled = true;
+ try {
+  const sites = await request('/api/sites'); list.replaceChildren(...sites.map(render));
+  document.querySelector('#count').textContent = sites.length + (sites.length === 1 ? ' page' : ' pages');
+  if (!sites.length) {
+   const empty = node('div', 'empty'); empty.append(node('h3', '', 'Publish your first page'), node('p', '', 'Create an HTML file, then publish it from your terminal:'));
+   empty.append(node('code', '', 'pteron publish page.html')); list.append(empty);
+  }
+  notice('');
+ } finally { loading = false; refresh.disabled = false; }
+}
+document.querySelector('#refresh').addEventListener('click', () => load().catch(error => notice(error.message, true)));
+load().catch(error => notice('Could not load pages. ' + error.message, true));
+</script>
+</body>
+</html>
