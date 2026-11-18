@@ -1,19 +1,20 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>pteron · Published pages</title>
+<title>pteron · 已发布页面</title>
 <style>
 :root { color-scheme: light; --cloud:#f4f7fb; --ink:#243648; --blue:#365bd6; --lavender:#e9e7f5; --line:#dce3ed; --paper:#fff; }
 * { box-sizing:border-box; }
-body { margin:0; background:var(--cloud); color:var(--ink); font:16px/1.5 "Segoe UI",Candara,sans-serif; }
+body { margin:0; background:var(--cloud); color:var(--ink); font:16px/1.5 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
 main { max-width:1380px; margin:auto; padding:48px 40px 80px; }
 header { display:flex; align-items:center; justify-content:space-between; gap:24px; margin-bottom:56px; }
 .brand { display:flex; align-items:center; gap:16px; }
 .brand svg { width:52px; height:52px; color:var(--blue); }
-h1 { margin:0; font:600 38px/1.1 "Trebuchet MS",sans-serif; letter-spacing:-1.5px; }
+h1 { margin:0; font:600 38px/1.1 "Trebuchet MS",system-ui,sans-serif; letter-spacing:-1.5px; }
 .subtitle { margin:5px 0 0; color:#526579; font-size:14px; }
+.header-actions { display:flex; align-items:center; gap:10px; }
 button { font:inherit; font-size:14px; border:1px solid #bdcbdc; border-radius:7px; background:var(--paper); color:var(--ink); padding:7px 12px; cursor:pointer; }
 button:hover { background:#eaf0fb; }
 button:disabled { opacity:.6; cursor:wait; }
@@ -51,17 +52,95 @@ footer { color:#526579; font-size:13px; margin-top:24px; }
 <body>
 <main>
 <header>
- <div class="brand"><svg viewBox="0 0 60 60" aria-hidden="true" fill="none"><path d="M7 45 25 13l28-4-22 16-5 26-9-13" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="m17 38 14-13 22-16" stroke="currentColor" stroke-width="2"/></svg><div><h1>pteron</h1><p class="subtitle">A home for your published pages.</p></div></div>
- <button id="refresh" type="button">Refresh</button>
+ <div class="brand"><svg viewBox="0 0 60 60" aria-hidden="true" fill="none"><path d="M7 45 25 13l28-4-22 16-5 26-9-13" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="m17 38 14-13 22-16" stroke="currentColor" stroke-width="2"/></svg><div><h1>pteron</h1><p class="subtitle" id="subtitle">本地已发布页面与反馈管理</p></div></div>
+ <div class="header-actions">
+  <button id="lang" type="button">EN</button>
+  <button id="refresh" type="button">刷新</button>
+ </div>
 </header>
-<div class="topline"><h2>Published pages</h2><span id="count"></span></div>
-<div class="columns" aria-hidden="true"><span>Page</span><span>Share</span><span>Activity</span><span>Feedback</span></div>
+<div class="topline"><h2 id="heading">已发布页面</h2><span id="count"></span></div>
+<div class="columns" aria-hidden="true"><span id="col-page">页面</span><span id="col-share">分享链接</span><span id="col-activity">时间</span><span id="col-feedback">反馈状态</span></div>
 <div id="sites" aria-live="polite"></div>
 <p id="message" role="status"></p>
-<footer>Pages and feedback stay on this machine. Share a page’s URL with devices on your tailnet.</footer>
+<footer id="footer">页面与反馈数据均保存在本机。可将页面链接分享给 Tailscale 局域网内的其他设备访问。</footer>
 </main>
 <script>
 'use strict';
+const I18N = {
+ zh: {
+  langAttr: 'zh-CN',
+  docTitle: 'pteron · 已发布页面',
+  subtitle: '本地已发布页面与反馈管理',
+  toggleLang: 'EN',
+  refresh: '刷新',
+  heading: '已发布页面',
+  colPage: '页面',
+  colShare: '分享链接',
+  colActivity: '时间',
+  colFeedback: '反馈状态',
+  footer: '页面与反馈数据均保存在本机。可将页面链接分享给 Tailscale 局域网内的其他设备访问。',
+  count: n => `共 ${n} 个页面`,
+  notSaved: '未保存',
+  copyUrl: '复制链接',
+  copied: '链接已复制。',
+  copyFailed: '请手动选中页面链接进行复制。',
+  updated: '更新于',
+  created: '创建于',
+  statusSubmitted: n => `已提交 · ${n} 项`,
+  statusSaved: n => `已保存 ${n} 项`,
+  statusEmpty: '暂无反馈',
+  clearFeedback: '清空反馈',
+  confirmClear: title => `确定要清空“${title}”的所有反馈数据吗？`,
+  cleared: '反馈已清空。',
+  viewJson: '查看 JSON',
+  hideJson: '收起 JSON',
+  deleteBtn: '删除',
+  confirmDelete: title => `确定要删除“${title}”及其保存的反馈数据吗？`,
+  deleted: '页面已删除。',
+  emptyTitle: '还没有已发布的页面',
+  emptyDesc: '创建 HTML 文件后，在终端运行以下命令即可发布：',
+  loadError: msg => '加载页面列表失败：' + msg,
+  requestFailed: status => '请求失败：' + status
+ },
+ en: {
+  langAttr: 'en',
+  docTitle: 'pteron · Published pages',
+  subtitle: 'A home for your published pages.',
+  toggleLang: '中文',
+  refresh: 'Refresh',
+  heading: 'Published pages',
+  colPage: 'Page',
+  colShare: 'Share',
+  colActivity: 'Activity',
+  colFeedback: 'Feedback',
+  footer: 'Pages and feedback stay on this machine. Share a page’s URL with devices on your tailnet.',
+  count: n => n + (n === 1 ? ' page' : ' pages'),
+  notSaved: 'Not saved',
+  copyUrl: 'Copy URL',
+  copied: 'URL copied.',
+  copyFailed: 'Select the page URL to copy it.',
+  updated: 'Updated',
+  created: 'Created',
+  statusSubmitted: n => 'Submitted · ' + n + ' fields',
+  statusSaved: n => n + ' saved fields',
+  statusEmpty: 'No feedback',
+  clearFeedback: 'Clear feedback',
+  confirmClear: title => 'Clear all feedback for “' + title + '”?',
+  cleared: 'Feedback cleared.',
+  viewJson: 'View JSON',
+  hideJson: 'Hide JSON',
+  deleteBtn: 'Delete',
+  confirmDelete: title => 'Delete “' + title + '” and its saved feedback?',
+  deleted: 'Page deleted.',
+  emptyTitle: 'Publish your first page',
+  emptyDesc: 'Create an HTML file, then publish it from your terminal:',
+  loadError: msg => 'Could not load pages. ' + msg,
+  requestFailed: status => 'Request failed: ' + status
+ }
+};
+let currentLang = localStorage.getItem('pteron_lang') === 'en' ? 'en' : 'zh';
+let cachedSites = [];
+const t = () => I18N[currentLang];
 const list = document.querySelector('#sites');
 const message = document.querySelector('#message');
 function notice(text, error = false) { message.textContent = text; message.classList.toggle('error', error); }
@@ -74,65 +153,89 @@ function button(label, action, className) {
 async function request(path, method = 'GET') {
  const response = await fetch(path, { method, cache:'no-store' });
  const result = await response.json();
- if (!response.ok) throw new Error(result.error || 'Request failed: ' + response.status);
+ if (!response.ok) throw new Error(result.error || t().requestFailed(response.status));
  return result;
 }
-function date(value) { return value ? new Date(value).toLocaleString(undefined, { dateStyle:'medium', timeStyle:'short' }) : 'Not saved'; }
+function date(value) { return value ? new Date(value).toLocaleString(t().langAttr, { dateStyle:'medium', timeStyle:'short' }) : t().notSaved; }
 async function copy(text) {
  if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
  else {
   const field = node('textarea'); field.value = text; field.style.cssText = 'position:fixed;left:-9999px;'; document.body.append(field); field.select();
   const success = document.execCommand('copy'); field.remove();
-  if (!success) throw new Error('Select the page URL to copy it.');
+  if (!success) throw new Error(t().copyFailed);
  }
- notice('URL copied.');
+ notice(t().copied);
 }
 function render(site) {
+ const i18n = t();
  const article = node('article');
  const row = node('div', 'row');
  const page = node('div');
  const title = node('h3'); const link = node('a', '', site.title); link.href = '/s/' + encodeURIComponent(site.id); link.target = '_blank'; link.rel = 'noopener'; title.append(link);
  page.append(title, node('div', 'site-id', site.id));
- const share = node('div'); const address = node('a', 'address', site.url); address.href = site.url; address.target = '_blank'; address.rel = 'noopener'; share.append(address, button('Copy URL', () => copy(site.url)));
+ const share = node('div'); const address = node('a', 'address', site.url); address.href = site.url; address.target = '_blank'; address.rel = 'noopener'; share.append(address, button(i18n.copyUrl, () => copy(site.url)));
  const times = node('div', 'times');
- for (const [label, value] of [['Updated', site.updated_at], ['Created', site.created_at]]) { const item = node('div'); item.append(node('strong', '', label), document.createTextNode(date(value))); times.append(item); }
+ for (const [label, value] of [[i18n.updated, site.updated_at], [i18n.created, site.created_at]]) { const item = node('div'); item.append(node('strong', '', label), document.createTextNode(date(value))); times.append(item); }
  const feedback = site.feedback || { fields:{} };
  const count = Object.keys(feedback.fields || {}).length;
- const controls = node('div'); controls.append(node('span', 'status', feedback.submitted ? 'Submitted · ' + count + ' fields' : count ? count + ' saved fields' : 'No feedback'));
+ const controls = node('div'); controls.append(node('span', 'status', feedback.submitted ? i18n.statusSubmitted(count) : count ? i18n.statusSaved(count) : i18n.statusEmpty));
  const expanded = node('div', 'feedback'); expanded.hidden = true; expanded.id = 'feedback-' + site.id;
  const pre = node('pre', '', JSON.stringify(feedback, null, 2)); expanded.append(pre);
- expanded.append(button('Clear feedback', async () => {
-  if (!confirm('Clear all feedback for “' + site.title + '”?')) return;
-  await request('/api/sites/' + site.id + '/feedback', 'DELETE'); await load(); notice('Feedback cleared.');
+ expanded.append(button(i18n.clearFeedback, async () => {
+  if (!confirm(t().confirmClear(site.title))) return;
+  await request('/api/sites/' + site.id + '/feedback', 'DELETE'); await load(); notice(t().cleared);
  }, 'danger'));
  const actions = node('div', 'actions');
- const view = button('View JSON', async el => {
-  expanded.hidden = !expanded.hidden; el.setAttribute('aria-expanded', String(!expanded.hidden)); el.textContent = expanded.hidden ? 'View JSON' : 'Hide JSON';
+ const view = button(i18n.viewJson, async el => {
+  expanded.hidden = !expanded.hidden; el.setAttribute('aria-expanded', String(!expanded.hidden)); el.textContent = expanded.hidden ? t().viewJson : t().hideJson;
   if (!expanded.hidden) pre.textContent = JSON.stringify(await request('/api/sites/' + site.id + '/feedback'), null, 2);
  });
  view.setAttribute('aria-controls', expanded.id); view.setAttribute('aria-expanded', 'false');
- actions.append(view, button('Delete', async () => {
-  if (!confirm('Delete “' + site.title + '” and its saved feedback?')) return;
-  await request('/api/sites/' + site.id, 'DELETE'); await load(); notice('Page deleted.');
+ actions.append(view, button(i18n.deleteBtn, async () => {
+  if (!confirm(t().confirmDelete(site.title))) return;
+  await request('/api/sites/' + site.id, 'DELETE'); await load(); notice(t().deleted);
  }, 'danger'));
  controls.append(actions); row.append(page, share, times, controls); article.append(row, expanded); return article;
+}
+function renderSites() {
+ const i18n = t();
+ document.documentElement.lang = i18n.langAttr;
+ document.title = i18n.docTitle;
+ document.querySelector('#subtitle').textContent = i18n.subtitle;
+ document.querySelector('#lang').textContent = i18n.toggleLang;
+ document.querySelector('#refresh').textContent = i18n.refresh;
+ document.querySelector('#heading').textContent = i18n.heading;
+ document.querySelector('#col-page').textContent = i18n.colPage;
+ document.querySelector('#col-share').textContent = i18n.colShare;
+ document.querySelector('#col-activity').textContent = i18n.colActivity;
+ document.querySelector('#col-feedback').textContent = i18n.colFeedback;
+ document.querySelector('#footer').textContent = i18n.footer;
+ list.replaceChildren(...cachedSites.map(render));
+ document.querySelector('#count').textContent = i18n.count(cachedSites.length);
+ if (!cachedSites.length) {
+  const empty = node('div', 'empty'); empty.append(node('h3', '', i18n.emptyTitle), node('p', '', i18n.emptyDesc));
+  empty.append(node('code', '', 'pteron publish page.html')); list.append(empty);
+ }
 }
 let loading = false;
 async function load() {
  if (loading) return; loading = true;
  const refresh = document.querySelector('#refresh'); refresh.disabled = true;
  try {
-  const sites = await request('/api/sites'); list.replaceChildren(...sites.map(render));
-  document.querySelector('#count').textContent = sites.length + (sites.length === 1 ? ' page' : ' pages');
-  if (!sites.length) {
-   const empty = node('div', 'empty'); empty.append(node('h3', '', 'Publish your first page'), node('p', '', 'Create an HTML file, then publish it from your terminal:'));
-   empty.append(node('code', '', 'pteron publish page.html')); list.append(empty);
-  }
+  cachedSites = await request('/api/sites');
+  renderSites();
   notice('');
  } finally { loading = false; refresh.disabled = false; }
 }
+document.querySelector('#lang').addEventListener('click', () => {
+ currentLang = currentLang === 'zh' ? 'en' : 'zh';
+ localStorage.setItem('pteron_lang', currentLang);
+ renderSites();
+ notice('');
+});
 document.querySelector('#refresh').addEventListener('click', () => load().catch(error => notice(error.message, true)));
-load().catch(error => notice('Could not load pages. ' + error.message, true));
+renderSites();
+load().catch(error => notice(t().loadError(error.message), true));
 </script>
 </body>
 </html>
