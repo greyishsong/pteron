@@ -4,6 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
+ExecStartPre=-/usr/bin/tailscale wait --timeout=30s
 ExecStart=%h/.local/bin/pteron serve
 WorkingDirectory=%h
 Restart=on-failure
