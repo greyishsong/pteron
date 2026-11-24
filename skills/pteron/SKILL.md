@@ -5,14 +5,14 @@ description: Publish single-file HTML artifacts and interactive feedback pages t
 
 # pteron
 
-`pteron` publishes standalone HTML pages to a local background daemon (`pteron.service`) and collects user responses asynchronously. The daemon serves pages on `127.0.0.1:8848` and the host Tailscale IPv4 address (`100.64.0.2:8848`), generating a direct URL (`http://<tailscale-ip>:8848/s/<id>`) that users can open from any device on the tailnet.
+`pteron` publishes standalone HTML pages to a local background daemon (`pteron.service`) and collects user responses asynchronously. The daemon serves pages on `127.0.0.1:8848` and, when Tailscale is available, automatically detects and binds to the host's Tailscale IPv4 address (`<tailscale-ip>:8848`), generating a direct URL (`http://<host-ip>:8848/s/<id>`) that users can open from other devices on the tailnet.
 
 ## Publishing Workflow
 
 Follow these steps when sharing interactive reports, design reviews, forms, or prototypes with the user:
 
 1. Write a standalone HTML file containing inline CSS and JavaScript (or public CDN scripts).
-2. Publish the file with `pteron publish` and share the returned Tailscale URL (`http://100.64.0.2:8848/s/<id>`).
+2. Publish the file with `pteron publish` and share the returned URL (`http://<host-ip>:8848/s/<id>`).
 3. Update the page directly with `pteron update <id>` whenever revisions are needed; open browser tabs reload automatically while preserving earlier user input.
 4. Retrieve structured responses with `pteron feedback <id>` once the user finishes reviewing.
 
@@ -66,7 +66,7 @@ Build each page as a standalone HTML document. Inline your styles and scripts or
 
 When serving `/s/<id>`, `pteron` injects `/_pteron/runtime.js` into the HTML response. This runtime automatically tracks every `<input>`, `<textarea>`, and `<select>` element anywhere in the document, including inputs placed inside cards, tables, diagrams, or tabs without a `<form>` wrapper.
 
-`runtime.js` identifies each field by checking `name`, then `data-field`, and finally `id`. You can also make any element editable and tracked by adding `contenteditable="true"` alongside a `data-field` attribute:
+`runtime.js` identifies each field by checking `data-field`, then `name`, and finally `id`. You can also make any element editable and tracked by adding `contenteditable="true"` alongside a `data-field` attribute:
 
 ```html
 <div contenteditable="true" data-field="reviewer_notes">
